@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Condition Timer</title>
+<style>
+  body {
+    font-family: sans-serif;
+    text-align: center;
+    margin: 2em;
+    background-color: #000;
+    color: #fff;
+  }
+  video {
+    width: 80%;
+    max-width: 720px;
+    display: block;
+    margin: 1em auto;
+    background-color: #111;
+  }
+  button {
+    margin: 0.5em;
+    padding: 0.6em 1.2em;
+    font-size: 1.1em;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.1s ease, background-color 0.2s;
+  }
+  button:hover {
+    transform: scale(1.05);
+  }
+  #positive { background: #2e7d32; }        /* dark green */
+  #negative { background: #c62828; }        /* dark red */
+  #download { background: #1565c0; }         /* dark blue */
+  #videoFile { color: #fff; margin: 1em; }
+
+  table {
+    margin: 1em auto;
+    border-collapse: collapse;
+    width: 80%;
+    max-width: 720px;
+    background-color: #111;
+  }
+  th, td {
+    border: 1px solid #444;
+    padding: 6px 10px;
+    text-align: center;
+  }
+  th {
+    background-color: #222;
+  }
+  tr:nth-child(even) {
+    background-color: #1a1a1a;
+  }
+  tr:nth-child(odd) {
+    background-color: #111;
+  }
+</style>
+</head>
+<body>
+
+<h1>Condition Timer</h1>
+
+<input type="file" id="videoFile" accept="video/*"><br>
+<video id="vid" controls></video><br>
+
+<button id="positive">Positive (P)</button>
+<button id="negative">Negative (N)</button>
+<button id="download">Download CSV</button>
+
+<table id="logTable">
+  <thead><tr><th>#</th><th>Label</th><th>Frame</th><th>Time (s)</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const vid = document.getElementById('vid');
+const fileInput = document.getElementById('videoFile');
+const tableBody = document.querySelector('#logTable tbody');
+let videoName = 'timings';
+let counter = 1;
+let lastFrame = 0;
+const data = [];
+
+// === Frame count tracker ===
+function updateFrameCount(now, metadata) {
+  lastFrame = metadata.presentedFrames;
+  vid.requestVideoFrameCallback(updateFrameCount);
+}
+vid.requestVideoFrameCallback(updateFrameCount);
+
+// === Initial row ===
+function addInitialRow() {
+  const first = { index: counter, label: 'positive', frame: 0, time: '0.0' };
+  data.push(first);
+  const row = document.createElement('tr');
+  row.innerHTML = `<td>${first.index}</td><td>${first.label}</td><td>${first.frame}</td><td>${first.time}</td>`;
+  tableBody.appendChild(row);
+}
+addInitialRow();
+
+// === Handle video upload ===
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) {
+    videoName = file.name.replace(/\.[^/.]+$/, "");
+    vid.src = URL.createObjectURL(file);
+    vid.load();
+  }
+});
+
+// === Record event ===
+function record(label) {
+  if (!vid.src) return alert('Please select a video first.');
+  counter += 1;
+  const t = vid.currentTime.toFixed(3);
+  const entry = { index: counter, label, frame: lastFrame, time: t };
+  data.push(entry);
+
+  const row = document.createElement('tr');
+  row.innerHTML = `<td>${entry.index}</td><td>${entry.label}</td><td>${entry.frame}</td><td>${entry.time}</td>`;
+  tableBody.insertBefore(row, tableBody.firstChild); // add to top
+}
+
+// === Button and keyboard ===
+document.getElementById('positive').addEventListener('click', () => record('positive'));
+document.getElementById('negative').addEventListener('click', () => record('negative'));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'p') record('positive');
+  else if (e.key.toLowerCase() === 'n') record('negative');
+});
+
+// === CSV download ===
+document.getElementById('download').addEventListener('click', () => {
+  if (data.length === 0) return alert('No data recorded.');
+  const csv = 'index,label,frame,time_s\n' +
+    data.map(d => `${d.index},${d.label},${d.frame},${d.time}`).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${videoName}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+
+</body>
+</html>
